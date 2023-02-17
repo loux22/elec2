@@ -33,19 +33,21 @@ services:
       dockerfile: Web/Dockerfile
       context: ./
     depends_on:
-      - applicants.api
-      - identity.api
-      - jobs.api
+      - service-api-applicants
+      - service-api-identity
+      - service-api-jobs
     restart: always
+    networks:
+      - web
 
-  applicants.api:
+  service-api-applicants:
     image: lardilly/applicants.api
     environment:
       - ConnectionString=Server=sql.data;User=sa;Password=Pass@word;Database=dotnetgigs.applicants;
       - HostRabbitmq=rabbitmq
     ports: 
     - 8081:80
-    container_name: applicants.api
+    container_name:  service-api-applicants
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -53,15 +55,16 @@ services:
     networks:
       - sql
       - rabbit
+      - web
 
-  jobs.api:
+  service-api-jobs:
     image: lardilly/jobs.api
     environment:
       - ConnectionString=Server=sql.data;User=sa;Password=Pass@word;Database=dotnetgigs.jobs;
       - HostRabbitmq=rabbitmq 
     ports: 
     - 8083:80
-    container_name: jobs.api
+    container_name: service-api-jobs
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -69,15 +72,16 @@ services:
     networks:
       - sql
       - rabbit
+      - web
 
-  identity.api:
+  service-api-identity:
     image: lardilly/identity.api
     environment:
       - RedisHost=user.data:6379
       - HostRabbitmq=rabbitmq
     ports: 
     - 8084:80
-    container_name: identity.api
+    container_name: service-api-identity
     depends_on:
       rabbitmq:
         condition: service_healthy       
@@ -85,6 +89,7 @@ services:
     networks:
       - redis
       - rabbit
+      - web
 
   sql.data:
     image: mcr.microsoft.com/mssql/server:2017-latest
@@ -108,4 +113,6 @@ networks:
   redis:
     driver: "bridge"
   sql:
+    driver: "bridge"
+  web:
     driver: "bridge"

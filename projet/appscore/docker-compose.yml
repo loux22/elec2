@@ -1,0 +1,111 @@
+version: '3'
+
+services:
+  user.data:
+    image: redis
+    ports:
+      - 6379:6379
+    networks:
+      - redis
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - 15672:15672
+      - 5672:5672
+    container_name: rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      - sql.data
+      - user.data
+    networks:
+      - rabbit
+    
+  webmvc:
+    ports: 
+    - 8080:80
+    container_name: web
+    build:
+      dockerfile: Web/Dockerfile
+      context: ./
+    depends_on:
+      - applicants.api
+      - identity.api
+      - jobs.api
+    restart: always
+
+  applicants.api:
+    image: lardilly/applicants.api
+    environment:
+      - ConnectionString=Server=sql.data;User=sa;Password=Pass@word;Database=dotnetgigs.applicants;
+      - HostRabbitmq=rabbitmq
+    ports: 
+    - 8081:80
+    container_name: applicants.api
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: always
+    networks:
+      - sql
+      - rabbit
+
+  jobs.api:
+    image: lardilly/jobs.api
+    environment:
+      - ConnectionString=Server=sql.data;User=sa;Password=Pass@word;Database=dotnetgigs.jobs;
+      - HostRabbitmq=rabbitmq 
+    ports: 
+    - 8083:80
+    container_name: jobs.api
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: always
+    networks:
+      - sql
+      - rabbit
+
+  identity.api:
+    image: lardilly/identity.api
+    environment:
+      - RedisHost=user.data:6379
+      - HostRabbitmq=rabbitmq
+    ports: 
+    - 8084:80
+    container_name: identity.api
+    depends_on:
+      rabbitmq:
+        condition: service_healthy       
+    restart: always
+    networks:
+      - redis
+      - rabbit
+
+  sql.data:
+    image: mcr.microsoft.com/mssql/server:2017-latest
+    ports:
+      - 1433:1433
+    container_name: mssql
+    build:
+      dockerfile: Database/Dockerfile
+      context: ./
+    volumes:
+      - sql-data:/data
+    networks:
+      - sql
+
+volumes:
+  sql-data:
+
+networks:
+  rabbit:
+    driver: "bridge"
+  redis:
+    driver: "bridge"
+  sql:
+    driver: "bridge"
